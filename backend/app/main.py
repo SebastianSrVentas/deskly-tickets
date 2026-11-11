@@ -19,6 +19,7 @@ from app.errores import registrar_handlers
 from app.observabilidad.logging import configurar_logging, obtener_logger
 from app.observabilidad.middleware import MiddlewareContexto
 from app.redis import conexion_redis
+from app.seed import sembrar_si_vacio
 
 settings = get_settings()
 logger = obtener_logger(__name__)
@@ -44,6 +45,19 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         )
 
     logger.info("aplicacion_iniciada", extra={"entorno": settings.entorno})
+
+    if settings.seed_on_start:
+        try:
+            sembrados = await sembrar_si_vacio()
+            if sembrados:
+                logger.info("seed_inicial", extra={"tickets": sembrados})
+        except Exception as exc:
+            # Un seed fallido no debe impedir que la API arranque.
+            logger.warning(
+                "seed_fallido",
+                extra={"motivo": f"{type(exc).__name__}: {exc}"},
+            )
+
     tarea_eventos = asyncio.create_task(escuchar_eventos())
     yield
 

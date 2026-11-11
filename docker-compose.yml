@@ -66,6 +66,7 @@ services:
       RATE_LIMIT_IP_POR_SEGUNDO: ${RATE_LIMIT_IP_POR_SEGUNDO:-100}
       RATE_LIMIT_IP_RAFAGA: ${RATE_LIMIT_IP_RAFAGA:-100}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SEED_ON_START: ${SEED_ON_START:-true}
     ports:
       - "8000:8000"
     networks:

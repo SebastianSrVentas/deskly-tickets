@@ -46,6 +46,10 @@ class Settings(BaseSettings):
 
     request_id_header: str = "X-Request-ID"
 
+    # Siembra 12 tickets de ejemplo cuando la base esta vacia. Se apaga en
+    # produccion con SEED_ON_START=false.
+    seed_on_start: bool = True
+
     @field_validator("log_level")
     @classmethod
     def validar_nivel_log(cls, valor: str) -> str:
