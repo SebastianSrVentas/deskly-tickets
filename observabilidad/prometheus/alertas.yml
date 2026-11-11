@@ -1,0 +1,64 @@
+groups:
+  - name: deskly
+    rules:
+      - alert: BackendCaido
+        expr: up{job="deskly-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "El backend no responde"
+          description: "Prometheus no puede scrapear /metrics desde hace 1 minuto."
+
+      - alert: TasaErrores5xx
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mas de 5% de respuestas 5xx"
+          description: "La tasa de errores supera el umbral durante 5 minutos."
+
+      - alert: LatenciaP95Alta
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia p95 por encima de 1s"
+          description: "El percentil 95 de latencia supera 1 segundo durante 5 minutos."
+
+      - alert: RedisCaido
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis no responde"
+          description: "Sin Redis no hay eventos en vivo ni rate limiting distribuido."
+
+      - alert: MongoCaido
+        expr: up{job="mongo"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MongoDB no responde"
+          description: "Sin MongoDB la API no puede servir."
+
+      - alert: ColaAcumulada
+        expr: deskly_cola_pendientes > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Cola de trabajo acumulada"
+          description: "Hay mas de 100 mensajes pendientes en el stream durante 10 minutos."

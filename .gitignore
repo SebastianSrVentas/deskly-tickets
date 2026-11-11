@@ -1,0 +1,27 @@
+# Entorno y secretos
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Herramientas y artefactos locales
+.hermes/
+.DS_Store
+Thumbs.db
+coverage/
+htmlcov/

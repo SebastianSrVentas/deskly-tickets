@@ -1,0 +1,210 @@
+name: deskly
+
+networks:
+  deskly_net:
+    driver: bridge
+
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    stop_grace_period: 15s
+    networks:
+      - deskly_net
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:8.4-alpine
+    restart: unless-stopped
+    # AOF para no perder el stream ante un reinicio. noeviction: si Redis
+    # empieza a expulsar claves puede perder mensajes de la cola.
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - noeviction
+    networks:
+      - deskly_net
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  backend:
+    image: deskly-backend
+    build:
+      context: ./backend
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 15s
+    env_file:
+      - .env
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      REDIS_URL: redis://redis:6379/0
+      MONGO_DB: ${MONGO_DB:-deskly}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:?define WEBHOOK_SECRET en el archivo .env}
+      WEBHOOK_CLIENTES: ${WEBHOOK_CLIENTES:-}
+      WEBHOOK_TOLERANCIA_SEGUNDOS: ${WEBHOOK_TOLERANCIA_SEGUNDOS:-300}
+      WEBHOOK_MAX_BODY_BYTES: ${WEBHOOK_MAX_BODY_BYTES:-262144}
+      RATE_LIMIT_CLIENTE_POR_SEGUNDO: ${RATE_LIMIT_CLIENTE_POR_SEGUNDO:-50}
+      RATE_LIMIT_CLIENTE_RAFAGA: ${RATE_LIMIT_CLIENTE_RAFAGA:-50}
+      RATE_LIMIT_IP_POR_SEGUNDO: ${RATE_LIMIT_IP_POR_SEGUNDO:-100}
+      RATE_LIMIT_IP_RAFAGA: ${RATE_LIMIT_IP_RAFAGA:-100}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8000:8000"
+    networks:
+      - deskly_net
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    image: deskly-backend
+    build:
+      context: ./backend
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    command: ["python", "-m", "app.worker"]
+    env_file:
+      - .env
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      REDIS_URL: redis://redis:6379/0
+      MONGO_DB: ${MONGO_DB:-deskly}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    networks:
+      - deskly_net
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # El worker no expone HTTP: su salud se mide por el lag de la cola.
+    healthcheck:
+      disable: true
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    restart: unless-stopped
+    init: true
+    environment:
+      # URL interna para los Server Components: dentro de la red, "localhost"
+      # seria el propio contenedor de Next.
+      API_URL_INTERNA: http://backend:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    networks:
+      - deskly_net
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Perfil opcional: docker compose --profile obs up --build
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    profiles: ["obs"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./observabilidad/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - deskly_net
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    profiles: ["obs"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./observabilidad/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observabilidad/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    networks:
+      - deskly_net
+    depends_on:
+      - prometheus
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    profiles: ["obs"]
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - deskly_net
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.70.0
+    profiles: ["obs"]
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - deskly_net
+    depends_on:
+      - redis
+
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.44.0
+    profiles: ["obs"]
+    restart: unless-stopped
+    command:
+      - --mongodb.uri=mongodb://mongo:27017
+      - --collect-all
+    ports:
+      - "9216:9216"
+    networks:
+      - deskly_net
+    depends_on:
+      - mongo
+
+volumes:
+  mongo_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:

@@ -1,0 +1,19 @@
+# Solo para desarrollo local.
+#
+# Publica MongoDB y Redis en localhost para poder correr el backend con
+# `uv run uvicorn` fuera de Docker. No se usa en el camino del evaluador:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d mongo redis
+#   docker compose stop backend worker
+#   cd backend && uv run uvicorn app.main:app --reload --port 8000
+#
+# El arranque normal sigue siendo `docker compose up --build`, sin este archivo.
+
+services:
+  mongo:
+    ports:
+      - "27017:27017"
+
+  redis:
+    ports:
+      - "6379:6379"
