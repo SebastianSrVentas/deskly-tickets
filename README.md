@@ -50,6 +50,19 @@ curl -fsS http://localhost:8000/api/health/ready
 curl -fsS http://localhost:3000 > /dev/null && echo "frontend ok"
 ```
 
+### Datos de ejemplo
+
+Con `SEED_ON_START=true` (valor por defecto) el backend siembra 12 tickets
+variados cuando la coleccion esta vacia. Es idempotente: el documento
+`meta/seed_v1` impide duplicar en reinicios o con varias replicas, y el seed
+solo corre si `count_documents({}) == 0`.
+
+Para arrancar con la base vacia:
+
+```bash
+SEED_ON_START=false docker compose up --build
+```
+
 Observabilidad opcional (no participa en el arranque evaluado):
 
 ```bash
@@ -224,6 +237,13 @@ Debe responder `401 firma_invalida`.
   `app/error.tsx` con reintento.
 - `hooks/useTicketStream.ts` es el hook propio: reconexion, limpieza en
   `useEffect` y filtro por ticket.
+- `components/HiloComentarios.tsx` hace la UI optimista: el comentario aparece
+  antes de la respuesta y se revierte con mensaje de error si el POST falla. La
+  respuesta del POST trae el ticket completo, asi que se reemplaza el temporal
+  por los datos reales sin parpadeo.
+- Tipos generados desde OpenAPI: `npm run tipos` escribe `types/api.d.ts` con
+  `openapi-typescript`; `types/ticket.ts` deriva de ahi. El archivo generado se
+  versiona para que el build no dependa del backend levantado.
 - `components/LiveTickets.tsx` conecta el hook con `router.refresh()`. Next
   revalida el Server Component y actualiza la UI sin recargar la pagina; el
   debounce de 300 ms evita una revalidacion por cada evento de una rafaga.
@@ -263,7 +283,7 @@ contenedores (ver `DECISIONES.md`).
 
 ## Tiempo invertido
 
-Aproximadamente **30 horas de trabajo efectivo** (estimacion), repartidas asi:
+Aproximadamente **32 horas de trabajo efectivo** (estimacion), repartidas asi:
 
 | Fase | Horas |
 |---|---|
@@ -273,18 +293,10 @@ Aproximadamente **30 horas de trabajo efectivo** (estimacion), repartidas asi:
 | Frontend: SSR, dashboard, detalle y hook en vivo | 7 |
 | Docker, CI, pruebas manuales y correcciones | 2 |
 | Documentacion | 2 |
+| Bonus: seed, UI optimista y tipos generados | 2 |
 
 ## Que queda fuera y por que
 
-- **Seed automatico**: el brief lo lista como bonus, no como obligatorio. Los
-  datos se crean desde Swagger o con el webhook; anadir un seed que escriba en
-  Mongo al arrancar habria que hacerlo idempotente y no aporta al nucleo.
-- **Optimistic UI**: el refresco por RSC es mas simple y no miente si el
-  servidor rechaza el cambio. Una UI optimista exige revertir estado y duplicar
-  la validacion en el cliente.
-- **Tipos generados desde OpenAPI**: los tipos de `types/ticket.ts` estan
-  escritos a mano y alineados con Pydantic. Generarlos anade una herramienta y
-  un paso de build; con dos modelos no compensa.
 - **Despliegue en nube**: Amplify para Next, ECS/Fargate para FastAPI, Atlas y
   ElastiCache quedan documentados como ruta futura. El camino evaluado es
   `docker compose up --build` local; implementar la nube antes de cerrar el
@@ -292,6 +304,9 @@ Aproximadamente **30 horas de trabajo efectivo** (estimacion), repartidas asi:
 - **Tests de integracion con Mongo y Redis reales**: los tests obligatorios son
   unitarios. El flujo completo se verifico con `curl`, `httpx` y un cliente
   WebSocket contra los contenedores.
+- **Seed con datos de negocio reales**: el seed incluido es de demostracion
+  (12 tickets ficticios). Cargar datos de un cliente exigiria un importador y
+  reglas de privacidad que no forman parte del brief.
 
 ## Estado del proyecto
 
@@ -309,4 +324,7 @@ Aproximadamente **30 horas de trabajo efectivo** (estimacion), repartidas asi:
 - [x] Tests de maquina de estados y webhook
 - [x] Dockerfiles multi-stage, CI con lint y tests
 - [x] Reconexion automatica y suscripcion por ticket (bonus)
-- [ ] Seed automatico y tipos generados (bonus, fuera de alcance)
+- [x] Seed idempotente de 12 tickets de ejemplo (bonus)
+- [x] Comentarios con UI optimista y reversion (bonus)
+- [x] Tipos TypeScript generados desde OpenAPI (bonus)
+- [ ] Despliegue en nube: documentado como ruta futura

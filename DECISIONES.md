@@ -185,3 +185,39 @@ Mongo tiene indice unique por `event_id`, asi que un reintento no duplica. El
 cliente del worker usa `socket_timeout=10` porque `XREADGROUP` bloquea 5 s; un
 timeout menor corta la lectura y el worker entra en bucle. Es mas de lo que el
 brief pide, pero demuestra el patron completo y cuesta un solo contenedor.
+
+---
+
+### [Decision] Bonus de demo: seed, UI optimista y tipos generados
+
+**Contexto:** El obligatorio ya estaba cerrado. Quedaban tres bonus baratos y
+queria saber si aportaban a la demo o solo anadian ruido.
+
+**Uso LLM:** Pedi evaluar los tres con coste, beneficio y riesgo, y decidir
+despues. La primera recomendacion fue dejar fuera la UI optimista y los tipos, y
+hacer solo el seed. Al cerrar el obligatorio se implementaron los tres.
+
+**Salida del modelo:** Un seed que inserta si la coleccion esta vacia; una UI
+optimista con `useOptimistic`; tipos con `openapi-typescript` y un `Omit` para
+el campo `comentarios`, que el OpenAPI marca opcional por el `default_factory`.
+
+**Mi decision:**
+
+- **Seed**: se implemento con doble candado (`count_documents == 0` y el
+  documento `meta/seed_v1`). El segundo evita que dos replicas siembren a la vez.
+  Si la insercion falla, el candado se borra para permitir el reintento. Se
+  apaga con `SEED_ON_START=false`.
+- **UI optimista**: se implemento en `HiloComentarios.tsx`, pero **no** con
+  `useOptimistic`. El primer intento uso `action={enviar}`; React 19 envuelve
+  las acciones de formulario en una transicion y el comentario temporal no se
+  veia hasta que terminaba el fetch. La prueba con un fetch que fallaba tras
+  1.2 s mostro "Enviando..." pero no el comentario. Se cambio a `onSubmit` con
+  `preventDefault`, de modo que `setComentarios` es un update urgente y el
+  temporal aparece de inmediato. Si el POST falla, se filtra el temporal y se
+  muestra el error; si responde, la propia respuesta trae el ticket completo y
+  se reemplaza el temporal por los comentarios reales, sin depender del refresh.
+- **Tipos**: se generan con `npm run tipos` contra `/openapi.json`. El archivo
+  `types/api.d.ts` se versiona para que el build no necesite el backend
+  levantado. `types/ticket.ts` deriva de `components["schemas"]` y corrige con
+  `Omit` el unico campo que el generador marca opcional pero el backend siempre
+  devuelve.
