@@ -4,11 +4,11 @@ import { notFound } from "next/navigation";
 
 import { AccionesTicket } from "@/components/AccionesTicket";
 import { AppShell } from "@/components/AppShell";
-import { ComentarioForm } from "@/components/ComentarioForm";
 import { EstadoBadge } from "@/components/EstadoBadge";
+import { HiloComentarios } from "@/components/HiloComentarios";
 import { PrioridadBadge } from "@/components/PrioridadBadge";
 import { obtenerTicket } from "@/lib/api";
-import { fechaRelativa, iniciales } from "@/lib/formato";
+import { fechaRelativa } from "@/lib/formato";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -57,41 +57,10 @@ export default async function DetalleTicket({ params }: Props) {
             </p>
           </section>
 
-          <section className="card p-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-ink">Comentarios</h2>
-              <span className="text-xs text-muted">{ticket.comentarios.length}</span>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              {ticket.comentarios.length === 0 ? (
-                <p className="text-sm text-muted">
-                  Todavia no hay comentarios en este ticket.
-                </p>
-              ) : (
-                ticket.comentarios.map((comentario) => (
-                  <article key={comentario.id} className="flex gap-3">
-                    <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-brand-soft text-[10px] font-semibold text-brand">
-                      {iniciales(comentario.autor)}
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-baseline gap-2">
-                        <p className="text-[13px] font-medium text-ink">{comentario.autor}</p>
-                        <p className="text-[11px] text-muted">
-                          {fechaRelativa(comentario.creado_en)}
-                        </p>
-                      </div>
-                      <p className="mt-0.5 text-sm leading-relaxed text-ink-soft">
-                        {comentario.texto}
-                      </p>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-
-            <ComentarioForm ticketId={ticket.id} />
-          </section>
+          <HiloComentarios
+            ticketId={ticket.id}
+            comentariosIniciales={ticket.comentarios}
+          />
         </div>
 
         <aside className="space-y-4">

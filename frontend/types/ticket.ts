@@ -1,33 +1,25 @@
-export type Estado = "abierto" | "en_progreso" | "resuelto" | "cerrado";
+import type { components } from "./api";
 
-export type Prioridad = "baja" | "media" | "alta" | "critica";
+type TicketApi = components["schemas"]["TicketSalida"];
 
-export interface Comentario {
-  id: string;
-  autor: string;
-  texto: string;
-  creado_en: string;
-}
+export type Estado = components["schemas"]["Estado"];
 
-export interface Ticket {
-  id: string;
-  titulo: string;
-  descripcion: string;
-  prioridad: Prioridad;
-  estado: Estado;
-  asignado_a: string | null;
+export type Prioridad = components["schemas"]["Prioridad"];
+
+export type Comentario = components["schemas"]["ComentarioSalida"];
+
+/**
+ * El OpenAPI marca `comentarios` como opcional porque Pydantic tiene un
+ * default_factory. El backend siempre lo devuelve; el frontend lo exige para
+ * no arrastrar `undefined` por todos los componentes.
+ */
+export type Ticket = Omit<TicketApi, "comentarios"> & {
   comentarios: Comentario[];
-  creado_en: string;
-  actualizado_en: string;
-}
+};
 
-export interface PaginaTickets {
+export type PaginaTickets = Omit<components["schemas"]["PaginaTickets"], "items"> & {
   items: Ticket[];
-  total: number;
-  pagina: number;
-  por_pagina: number;
-  paginas: number;
-}
+};
 
 export interface EventoTicket {
   tipo: "ticket.creado" | "ticket.actualizado" | "ticket.comentado";
