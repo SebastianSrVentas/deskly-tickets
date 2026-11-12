@@ -1,5 +1,7 @@
 # Recorrido del proyecto
 
+![Arquitectura de contenedores](docs/arquitectura.svg)
+
 Guia para demostrar Deskly y defender el codigo en la entrevista. Cada parada
 dice que mostrar, que archivo mirar y que decision explicar.
 

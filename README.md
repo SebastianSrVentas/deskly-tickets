@@ -74,6 +74,18 @@ Grafana queda en http://localhost:3001 (usuario `admin`, password
 
 ## Arquitectura
 
+![Arquitectura de contenedores](docs/arquitectura.svg)
+
+Diagrama editable en [docs/arquitectura.drawio](docs/arquitectura.drawio). Se
+regenera en los dos formatos con:
+
+```bash
+python docs/generar_arquitectura.py
+```
+
+<details>
+<summary>Version ASCII</summary>
+
 ```
                     red interna: deskly_net (DNS por servicio)
 
@@ -89,6 +101,7 @@ Grafana queda en http://localhost:3001 (usuario `admin`, password
                                   |
                               worker ---> mongo:auditoria
 ```
+</details>
 
 - Solo se publican `3000` y `8000`. MongoDB y Redis viven en la red interna.
 - El backend es stateless: puede escalar a varias replicas. Los eventos se
